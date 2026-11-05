@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+build/
+.tmp/
+.angular/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# logs & coverage
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Nest / misc
+*.tsbuildinfo
