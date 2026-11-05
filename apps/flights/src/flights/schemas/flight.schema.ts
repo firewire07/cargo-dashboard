@@ -28,3 +28,6 @@ export class Flight {
 }
 
 export const FlightSchema = SchemaFactory.createForClass(Flight);
+
+FlightSchema.index({ departureAt: 1 });
+FlightSchema.index({ origin: 1, destination: 1 });
