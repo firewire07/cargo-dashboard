@@ -1,0 +1,96 @@
+<h1>Cargo dashboard</h1>
+<p>Fictional demonstration data.</p>
+
+@let current = state();
+
+@if (current.status === 'loading') {
+  <p role="status">Loading capacity…</p>
+} @else if (current.status === 'error') {
+  <p role="alert">{{ current.message }}</p>
+} @else {
+  <dl>
+    <div>
+      <dt>Flights</dt>
+      <dd>{{ current.summary.flightCount | number }}</dd>
+    </div>
+    
+    <div>
+      <dt>Total capacity</dt>
+      <dd>{{ current.summary.totalCapacityKg | number }} kg</dd>
+    </div>
+
+    <div>
+      <dt>Booked weight</dt>
+      <dd>{{ current.summary.totalBookedKg | number }} kg</dd>
+    </div>
+
+    <div>
+      <dt>Weight utilisation</dt>
+      <dd>
+        @if (current.summary.utilisationPercent === null) {
+          Not available
+        } @else {
+          {{ current.summary.utilisationPercent | number:'1.2-2' }}%
+        }
+      </dd>
+    </div>
+  </dl>
+
+  <h2>Flights</h2>
+
+<div class="table-container">
+  <table>
+    <caption>Fictional cargo flights — departure times in Malaysia time (UTC+8)</caption>
+    <thead>
+      <tr>
+        <th scope="col">Flight</th>
+        <th scope="col">Route</th>
+        <th scope="col">Departure</th>
+        <th scope="col">Capacity (kg)</th>
+        <th scope="col">Booked (kg)</th>
+        <th scope="col">Revenue (USD)</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (flight of current.flights; track flight._id) {
+        <tr>
+          <th scope="row">{{ flight.flightNumber }}</th>
+          <td>{{ flight.origin }} - {{ flight.destination }}</td>
+          <td>{{ flight.departureAt | date:'dd MMM yyyy, HH:mm':'+0800' }}</td>
+          <td>{{ flight.capacityKg | number }}</td>
+          <td>{{ flight.bookedKg | number }}</td>
+          <td>{{ flight.revenueUsd | number:'1.2-2' }}</td>
+        </tr>
+      } @empty {
+        <tr>
+          <td colspan="6">No flights available.</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<h2>Weight utilisation by flight</h2>
+
+<ul class="utilisation-chart">
+  @for (flight of current.flights; track flight._id) {
+    <li>
+      <span>{{ flight.flightNumber }}</span>
+
+      @if (flight.capacityKg > 0) {
+        <meter
+          min="0"
+          max="100"
+          [value]="flight.bookedKg / flight.capacityKg * 100"
+          [attr.aria-label]="flight.flightNumber + ' weight utilisation'"
+        ></meter>
+        <span>
+          {{ flight.bookedKg / flight.capacityKg * 100 | number:'1.1-1' }}%
+        </span>
+      } @else {
+        <span>Not available</span>
+      }
+    </li>
+  }
+</ul>
+}
