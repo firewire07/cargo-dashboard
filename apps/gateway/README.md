@@ -1,114 +1,67 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# HTTP gateway
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Nest entry point for the future dashboard UI. `GET /flights` uses Nest's `HttpModule` (Axios) to call the flights data service and return its response body. The gateway does not own flight data or connect directly to MongoDB.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+[Main project guide](../../README.md) — prerequisites, Mongo startup, development seed and full startup order. See also the [flights service guide](../flights/README.md).
 
-## Description
+## Install and run
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Replace `/path/to/cargo-dashboard` below with your own checkout location.
 
-## Project setup
+Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). First start Mongo and the flights service following the main guide. Check that `http://localhost:3001/flights` responds before testing through the gateway.
+
+Install from the gateway's own lockfile:
 
 ```bash
-$ npm install
+cd /path/to/cargo-dashboard/apps/gateway
+npm ci
 ```
 
-## Compile and run the project
+Start in a separate terminal, leaving flights running (also run capacity on port 3002 for the summary route):
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cd /path/to/cargo-dashboard/apps/gateway
+FLIGHTS_URL=http://localhost:3001 CAPACITY_URL=http://localhost:3002 PORT=3000 npm run start:dev
 ```
 
-## Run tests
+Wait for successful Nest startup. From another terminal:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl -i http://localhost:3001/flights
+curl -i http://localhost:3000/flights
+curl -i http://localhost:3000/capacity/summary
 ```
 
-## Deployment
+The two flights calls should return HTTP 200 with the same JSON array (five fictional records immediately after seeding). The first call checks the upstream directly; the second checks forwarding. The third calls the capacity summary through the gateway and requires the capacity service. Gateway startup alone does not prove the upstream is reachable. Stop this app with **Ctrl+C**; stopping it does not stop flights or Mongo. See [stopping everything](../../README.md#stop-and-resume).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Environment
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `3000` | Gateway HTTP listener |
+| `FLIGHTS_URL` | `http://localhost:3001` | Flights upstream base URL |
+| `CAPACITY_URL` | `http://localhost:3002` | Capacity upstream base URL |
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+Use a base URL **without** `/flights` or a trailing slash: the service appends `/flights`. If flights uses another port, update this URL. Set values inline as above or with `export` in the gateway terminal; another terminal's exports do not apply here. The current bootstrap reads `process.env` and does not configure automatic `.env` loading. Mongo's URI belongs to the flights service, not the gateway.
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Design and performance learning
 
-## Observability
+These apps communicate over ordinary HTTP, not Nest's microservice transport layer. The gateway forwards the flight list and `GET /capacity/summary` to their respective services. Authentication, caching, rate limiting and upstream resilience policies are not implemented. A single API entry point simplifies the future UI, but the extra hop has overhead; this architecture is not proof of better performance. `firstValueFrom` converts the HTTP Observable to a Promise so the service can await the response.
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+Only Mongo is containerised today. All three Nest processes run on the host, which is why `localhost:3001` is the flights upstream address. Container networking will need different configuration if application containers are added later.
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+## Troubleshooting
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+- Gateway error / upstream connection refused: call port 3001 directly. Check flights is running and can reach Mongo; inspect both Nest terminal logs. This gateway has no custom upstream-error translation, so failures can surface as a generic server error.
+- Direct flights call works but gateway fails: check `FLIGHTS_URL` in the gateway terminal, without an extra path/trailing slash, then restart the gateway after changing it.
+- `EADDRINUSE`: another process owns port 3000. Stop your previous gateway or use a different `PORT` and update your curl URL.
+- Missing packages or Nest DI errors: run `npm ci` inside `apps/gateway`, not `apps/`.
+- Empty array from both calls: consult the flights guide; do not reseed valuable data merely to troubleshoot forwarding.
 
-## Resources
+## Other npm scripts
 
-Check out a few resources that may come in handy when working with NestJS:
+`npm run build` compiles; `npm start` runs without watch mode. Run `npm run build` before `npm run start:prod`. Scripts also exist for `npm run lint`, `npm test`, `npm run test:e2e` and `npm run test:cov`. Unit tests now live beside the feature controller/service. HTTP tests in `test/` stub the feature service and verify `/flights` routing without contacting the upstream; they are not live distributed integration coverage.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Feature organisation
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+`src/main.ts` handles bootstrap and `src/app.module.ts` wires root setup. The flight feature lives in `src/flights/` with its module, controller, service and co-located `*.spec.ts` unit tests. HTTP tests stay in `test/app.e2e-spec.ts`. Unused generated root controllers/services have been removed; `/flights` behaviour is unchanged.

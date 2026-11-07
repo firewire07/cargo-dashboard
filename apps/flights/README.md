@@ -1,114 +1,85 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Flights data service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Nest + Mongoose service owning flight documents in MongoDB. `GET /flights` reads all flights and sorts by `departureAt` ascending. The schema includes flight number, origin/destination, departure time, capacity/booked kilograms and revenue in USD, plus timestamps.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+[Main project guide](../../README.md) — architecture, prerequisites and full startup order.
 
-## Description
+## Install and run
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Replace `/path/to/cargo-dashboard` below with your own checkout location.
 
-## Project setup
+Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). Mongo must be ready before seeding or starting this service. Only Mongo runs in Docker; this Nest app runs on your host.
 
 ```bash
-$ npm install
+cd /path/to/cargo-dashboard/apps/flights
+npm ci
 ```
 
-## Compile and run the project
+Start Mongo from the repository root:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cd /path/to/cargo-dashboard
+docker compose up -d mongo
+docker compose logs --tail=50 mongo
+docker compose exec mongo mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'
 ```
 
-## Run tests
+Wait for `ok: 1` (retry the ping if Mongo is still starting). Then, in a dedicated terminal:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cd /path/to/cargo-dashboard/apps/flights
+MONGODB_URI=mongodb://localhost:27017/cargo-dashboard PORT=3001 npm run start:dev
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Watch mode recompiles on source changes. Wait for Nest startup, then check from another terminal:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+curl -i http://localhost:3001/flights
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Expected: HTTP 200 with a JSON array, empty if no flights exist. There are no list filters or pagination yet. Stop the service with **Ctrl+C**. Use the [root stop instructions](../../README.md#stop-and-resume) to stop Mongo without removing its data.
 
-## Observability
+## Development seed
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+> **Destructive: development databases only.** The script calls `deleteMany({})` on the flight model, then inserts five fictional demo flights. Every run replaces ALL flight data in the selected database. Never point it at production or valuable records. The two operations are not transactional; failed insertion may leave an empty collection.
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+After Mongo is ready and dependencies are installed:
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+```bash
+cd /path/to/cargo-dashboard/apps/flights
+MONGODB_URI=mongodb://localhost:27017/cargo-dashboard npm run seed
+```
 
-## Resources
+Success prints `Seeded flights` and disconnects. The explicit URI targets the local development database. The script itself also accepts `MONGODB_URI`, so verify the target before using a different value. Seed only when you want to initialise/replace demo data; do not run it on every startup. The five records are fictional learning data, not live airline data.
 
-Check out a few resources that may come in handy when working with NestJS:
+## Environment
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+| Variable | Default | Used by |
+| --- | --- | --- |
+| `PORT` | `3001` | HTTP listener |
+| `MONGODB_URI` | `mongodb://localhost:27017/cargo-dashboard` | API and seed |
 
-## Support
+The code reads `process.env` directly and does not configure automatic `.env` loading. Set variables inline as above or use `export` in the terminal running the command. Keep seed and API pointed at the same development database. If you change the service port, update both the gateway's and capacity service's `FLIGHTS_URL` in their respective terminals too.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Why these choices?
 
-## Stay in touch
+- Mongo does the sort instead of Node sorting an array. Schema indexes on `departureAt` and `(origin, destination)` support relevant query patterns; index use/performance must be measured, not assumed. Route filtering is future work.
+- Seeding separately avoids writes during list requests.
+- The current query returns all hydrated Mongoose documents; it does not yet use `.lean()`, field projection or pagination. Those are possible later improvements, not implemented performance claims.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Troubleshooting
 
-## License
+- Connection refused / Mongoose retries: check Docker is running, ping Mongo as above, and confirm the URI/port. The Compose host port is 27017.
+- Empty array: a fresh database has no records. Check the API and seed URI match before considering the destructive seed.
+- `EADDRINUSE`: stop your earlier flights process or select another `PORT`; adjust the gateway URL as well.
+- Missing packages or Nest DI errors: install with `npm ci` in **this app directory**, not its parent. Do not delete unrelated directories as a troubleshooting shortcut.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Other npm scripts
+
+`npm run build` compiles; `npm start` runs without watch mode. For a built run, use `npm run build` before `npm run start:prod`. `npm run lint`, `npm test`, `npm run test:e2e` and `npm run test:cov` are available scripts. Unit tests now live beside the feature controller/service. HTTP tests in `test/` stub the service and verify `/flights` routing without a database; they are not live Mongo integration coverage.
+
+## Feature organisation
+
+`src/main.ts` handles bootstrap and `src/app.module.ts` wires root setup. The flight feature lives in `src/flights/` with its module, controller, service and co-located `*.spec.ts` unit tests. HTTP tests stay in `test/app.e2e-spec.ts`. Unused generated root controllers/services have been removed; `/flights` behaviour is unchanged.
+
+The Mongo schema stays in `src/flights/schemas/flight.schema.ts`, and `src/flights/seed.ts` still backs `npm run seed`. Database model types stay inside this data service.

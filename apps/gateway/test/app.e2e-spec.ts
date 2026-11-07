@@ -1,26 +1,28 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import { FlightsService } from '../src/flights/flights.service';
+import { AppModule } from '../src/app.module';
 
-describe('AppController (e2e)', () => {
+// HTTP routing test with a stubbed service: no MongoDB or upstream HTTP calls.
+describe('Flights route (isolated HTTP)', () => {
   let app: INestApplication<App>;
+  const flights = [{ flightNumber: 'DEMO001', origin: 'KUL', destination: 'SIN' }];
 
   beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const module = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
+    })
+      .overrideProvider(FlightsService)
+      .useValue({ findAll: () => Promise.resolve(flights) })
+      .compile();
+    app = module.createNestApplication();
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  it('/flights (GET) preserves the JSON response', () => {
+    return request(app.getHttpServer()).get('/flights').expect(200).expect(flights);
   });
 
   afterEach(async () => {

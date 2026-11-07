@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 @Injectable()
 export class FlightsService {
   private readonly baseUrl =
-    process.env.FLIGHTS_URL ?? 'http://localhost:3000';
+    process.env.FLIGHTS_URL ?? 'http://localhost:3001';
 
   constructor(private readonly http: HttpService) {}
 
