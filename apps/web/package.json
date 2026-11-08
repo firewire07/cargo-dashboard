@@ -11,7 +11,7 @@
   "private": true,
   "engines": {
     "node": "22.x >= 22.19.0",
-    "npm": "10.9.3"
+    "npm": "11.6.2"
   },
   "packageManager": "npm@11.6.2",
   "dependencies": {

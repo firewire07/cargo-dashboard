@@ -4,13 +4,16 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## Development server
 
-To start a local development server, run:
+Start the Docker backend using the [main project guide](../../README.md#run-the-docker-backend). Angular itself still runs on the host, not in Compose. With web dependencies already installed, replace the checkout placeholder below and run:
 
 ```bash
-ng serve
+cd /path/to/cargo-dashboard/apps/web
+npm start -- --proxy-config proxy.conf.json
 ```
 
 Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+
+The explicit dev proxy forwards `/api` to the Docker gateway published at `http://localhost:3000` and removes `/api`. `npm start` alone does not enable this proxy automatically. Check `http://localhost:4200/api/flights` and `http://localhost:4200/api/capacity/summary` while the dev server is running. Stop Angular with Ctrl+C; stop/resume the backend separately using the root guide. This proxy is for development, not a production deployment.
 
 ## Code scaffolding
 

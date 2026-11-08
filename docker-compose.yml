@@ -2,9 +2,55 @@ services:
   mongo:
     image: mongo:7
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+  flights:
+    image: cargo-flights:dev
+    build:
+      context: ./apps/flights
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      MONGODB_URI: mongodb://mongo:27017/cargo-dashboard
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      mongo:
+        condition: service_healthy
+  capacity:
+    image: cargo-capacity:dev
+    build:
+      context: ./apps/capacity
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+      FLIGHTS_URL: http://flights:3001
+    ports:
+      - "127.0.0.1:3002:3002"
+    depends_on:
+      - flights
+
+  gateway:
+    image: cargo-gateway:dev
+    build:
+      context: ./apps/gateway
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      FLIGHTS_URL: http://flights:3001
+      CAPACITY_URL: http://capacity:3002
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - flights
+      - capacity
 
 volumes:
   mongo_data:

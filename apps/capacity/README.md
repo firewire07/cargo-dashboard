@@ -23,9 +23,28 @@ test/
 
 `AppModule` imports `CapacityModule`; `main.ts` bootstraps the app. The feature module owns HTTP client configuration (`timeout: 3000`, `maxRedirects: 0`), used for flights requests. The 3000 value here is a timeout in milliseconds, not a listener port. `FlightResponse` is the existing local HTTP-response interface, moved without changing its fields; it does not import a Mongo schema/entity from another app.
 
-## Run locally
+## Run with Docker Compose
 
-Replace `/path/to/cargo-dashboard` with your checkout location. Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). If dependencies are not installed, run `npm ci` inside this app first.
+Use the [root Docker workflow](../../README.md#run-the-docker-backend); stop any host Nest watch processes before binding the same ports.
+
+```bash
+cd /path/to/cargo-dashboard
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=50 capacity
+curl -i http://localhost:3002/capacity/flights
+curl -i http://localhost:3002/capacity/summary
+curl -i http://localhost:3000/capacity/summary
+```
+
+Compose builds `cargo-capacity:dev`, sets `PORT=3002` and `FLIGHTS_URL=http://flights:3001`, and publishes 3002 on host loopback. The last command checks the gateway path. Startup ordering waits for the flights container to start, not for its HTTP readiness. Capacity does not own a database; its endpoints depend on flights being available.
+
+The multi-stage Dockerfile installs production dependencies separately and runs compiled code as the non-root `node` user. Rebuild after source changes. Follow the [root safe stop/resume guide](../../README.md#stop-and-resume); ordinary down preserves Mongo data, whereas **down with `-v` deletes its volume**.
+
+## Host watch-mode alternative
+
+
+For host watch mode, stop the Compose backend, start only Mongo and run flights on the host before this app; avoid running both host and container listeners on the same port. Replace `/path/to/cargo-dashboard` with your checkout location. Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). If dependencies are not installed, run `npm ci` inside this app first.
 
 ```bash
 cd /path/to/cargo-dashboard/apps/capacity
@@ -38,7 +57,7 @@ From another terminal:
 curl -i http://localhost:3002/capacity/summary
 ```
 
-Start Mongo and flights on port 3001 first using the main guide. Expected: HTTP 200 with flight count, capacity/booked totals and utilisation (null for zero total capacity). Stop with **Ctrl+C**. The route depends on flights availability. Only Mongo is containerised by the root Compose file; this app runs on the host.
+Start Mongo and flights on port 3001 first using the main guide. Expected: HTTP 200 with flight count, capacity/booked totals and utilisation (null for zero total capacity). Stop with **Ctrl+C**. The route depends on flights availability. This alternative runs the Nest apps on the host; the default Docker workflow above runs all backend services in containers.
 
 `PORT` defaults to `3002` and is read from `process.env`. Set it inline or with a shell export; bootstrap does not configure automatic `.env` loading. `FLIGHTS_URL` defaults to `http://localhost:3001`; set the base URL without a trailing slash or `/flights`. Restart this app after changing the URL.
 

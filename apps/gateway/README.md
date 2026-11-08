@@ -1,14 +1,34 @@
 # HTTP gateway
 
-Nest entry point for the future dashboard UI. `GET /flights` uses Nest's `HttpModule` (Axios) to call the flights data service and return its response body. The gateway does not own flight data or connect directly to MongoDB.
+Nest entry point for the Angular dashboard UI. `GET /flights` uses Nest's `HttpModule` (Axios) to call the flights data service and return its response body. The gateway does not own flight data or connect directly to MongoDB.
 
 [Main project guide](../../README.md) — prerequisites, Mongo startup, development seed and full startup order. See also the [flights service guide](../flights/README.md).
 
-## Install and run
+## Run with Docker Compose
+
+Use the [root Docker workflow](../../README.md#run-the-docker-backend), stopping any host Nest processes on ports 3000–3002 first.
+
+```bash
+cd /path/to/cargo-dashboard
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=50 gateway
+curl -i http://localhost:3000/flights
+curl -i http://localhost:3000/capacity/summary
+```
+
+Compose builds `cargo-gateway:dev`, listens on 3000 with a loopback host publication, and sets `FLIGHTS_URL=http://flights:3001` and `CAPACITY_URL=http://capacity:3002`. Those service names work inside Compose; use `localhost:3000` from the host/browser. `depends_on` orders startup but does not wait for the upstream HTTP APIs to be ready. Use logs/direct endpoint checks if an initial request fails.
+
+Angular remains on the host: run `npm start -- --proxy-config proxy.conf.json` from `apps/web` after its dependencies are installed. `/api` is forwarded to this gateway with the prefix removed. See the [web guide](../web/README.md).
+
+Use the [root stop/resume instructions](../../README.md#stop-and-resume); do not use `down -v` for routine stopping because it deletes Mongo data. Rebuild images after backend source changes.
+
+## Host watch-mode alternative
+
 
 Replace `/path/to/cargo-dashboard` below with your own checkout location.
 
-Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). First start Mongo and the flights service following the main guide. Check that `http://localhost:3001/flights` responds before testing through the gateway.
+For host watch mode, stop the Compose backend, start only Mongo and follow the host instructions for flights/capacity; do not run their containers on the same ports. Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). First start Mongo and the flights service following the main guide. Check that `http://localhost:3001/flights` responds before testing through the gateway.
 
 Install from the gateway's own lockfile:
 
@@ -48,7 +68,7 @@ Use a base URL **without** `/flights` or a trailing slash: the service appends `
 
 These apps communicate over ordinary HTTP, not Nest's microservice transport layer. The gateway forwards the flight list and `GET /capacity/summary` to their respective services. Authentication, caching, rate limiting and upstream resilience policies are not implemented. A single API entry point simplifies the future UI, but the extra hop has overhead; this architecture is not proof of better performance. `firstValueFrom` converts the HTTP Observable to a Promise so the service can await the response.
 
-Only Mongo is containerised today. All three Nest processes run on the host, which is why `localhost:3001` is the flights upstream address. Container networking will need different configuration if application containers are added later.
+In the Docker workflow all three Nest services are containerised and use Compose DNS (`flights`, `capacity`). In the host alternative they use `localhost` URLs. Angular stays on the host in either case.
 
 ## Troubleshooting
 

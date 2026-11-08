@@ -4,11 +4,28 @@ Nest + Mongoose service owning flight documents in MongoDB. `GET /flights` reads
 
 [Main project guide](../../README.md) — architecture, prerequisites and full startup order.
 
-## Install and run
+## Run with Docker Compose
+
+Use the [root Docker workflow](../../README.md#run-the-docker-backend) for the full backend. Stop existing host Nest processes first to free ports 3000–3002.
+
+```bash
+cd /path/to/cargo-dashboard
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=50 flights
+curl -i http://localhost:3001/flights
+```
+
+Compose builds `cargo-flights:dev` from this app's Dockerfile, sets `PORT=3001` and `MONGODB_URI=mongodb://mongo:27017/cargo-dashboard`, and publishes the API on host loopback. Mongo must be healthy before flights starts. The production runtime runs compiled code as the non-root `node` user; source edits require rebuilding, not just restarting.
+
+Stop/resume using the [root persistence instructions](../../README.md#stop-and-resume). `mongo_data` survives ordinary `docker compose down`; **`down -v` deletes the database volume**. No automatic seed runs.
+
+## Host watch-mode alternative
+
 
 Replace `/path/to/cargo-dashboard` below with your own checkout location.
 
-Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). Mongo must be ready before seeding or starting this service. Only Mongo runs in Docker; this Nest app runs on your host.
+Use Node/npm meeting the [root prerequisites](../../README.md#prerequisites). Mongo must be ready before seeding or starting this service. For this alternative, stop the Compose backend first, then start only Mongo using the commands below; this Nest instance runs on the host. Do not also run the flights container on port 3001.
 
 ```bash
 cd /path/to/cargo-dashboard/apps/flights
@@ -43,7 +60,7 @@ Expected: HTTP 200 with a JSON array, empty if no flights exist. There are no li
 
 > **Destructive: development databases only.** The script calls `deleteMany({})` on the flight model, then inserts five fictional demo flights. Every run replaces ALL flight data in the selected database. Never point it at production or valuable records. The two operations are not transactional; failed insertion may leave an empty collection.
 
-After Mongo is ready and dependencies are installed:
+The runtime image has only compiled code and production dependencies, so it cannot run this TypeScript seed. From the host, after Mongo is ready and this app's development dependencies are installed (run `npm ci` in this app if needed):
 
 ```bash
 cd /path/to/cargo-dashboard/apps/flights
@@ -59,7 +76,7 @@ Success prints `Seeded flights` and disconnects. The explicit URI targets the lo
 | `PORT` | `3001` | HTTP listener |
 | `MONGODB_URI` | `mongodb://localhost:27017/cargo-dashboard` | API and seed |
 
-The code reads `process.env` directly and does not configure automatic `.env` loading. Set variables inline as above or use `export` in the terminal running the command. Keep seed and API pointed at the same development database. If you change the service port, update both the gateway's and capacity service's `FLIGHTS_URL` in their respective terminals too.
+The code reads `process.env` directly and does not configure automatic `.env` loading. Set variables inline as above or use `export` in the terminal running the command. Keep seed and API pointed at the same development database. Compose overrides the API URI with `mongodb://mongo:27017/cargo-dashboard`; host seeding reaches that database through the published localhost port. If you change the service port, update both the gateway's and capacity service's `FLIGHTS_URL` in their respective terminals too.
 
 ## Why these choices?
 
