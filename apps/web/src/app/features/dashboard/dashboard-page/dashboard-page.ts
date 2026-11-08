@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, forkJoin, map, of, startWith } from 'rxjs';
@@ -42,4 +42,21 @@ export class DashboardPage {
     ),
     { requireSync: true },
   );
+
+  readonly origin = signal('');
+  readonly destination = signal('');
+
+  readonly filteredFlights = computed(() => {
+    const current = this.state();
+    if (current.status !== 'success') return [];
+
+    const origin = this.origin().trim().toUpperCase();
+    const destination = this.destination().trim().toUpperCase();
+
+    return current.flights.filter(
+      (flight) =>
+        (!origin || flight.origin === origin) &&
+        (!destination || flight.destination === destination),
+    );
+  });
 }

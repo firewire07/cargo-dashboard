@@ -36,61 +36,94 @@
     </div>
   </dl>
 
+  <div class="filters">
+    <label>
+      Origin airport code
+      <input
+        #originInput
+        type="text"
+        maxlength="3"
+        placeholder="e.g. KUL"
+        [value]="origin()"
+        (input)="origin.set(originInput.value)"
+      />
+    </label>
+  
+    <label>
+      Destination airport code
+      <input
+        #destinationInput
+        type="text"
+        maxlength="3"
+        placeholder="e.g. SIN"
+        [value]="destination()"
+        (input)="destination.set(destinationInput.value)"
+      />
+    </label>
+  
+    <button type="button" (click)="origin.set(''); destination.set('')">
+      Clear filters
+    </button>
+  </div>
+  
+  <p role="status">{{ filteredFlights().length }} flights shown.</p>
+  <p>Summary cards show all flights; filters apply to the table and bars.</p>
+
   <h2>Flights</h2>
 
-<div class="table-container">
-  <table>
-    <caption>Fictional cargo flights — departure times in Malaysia time (UTC+8)</caption>
-    <thead>
-      <tr>
-        <th scope="col">Flight</th>
-        <th scope="col">Route</th>
-        <th scope="col">Departure</th>
-        <th scope="col">Capacity (kg)</th>
-        <th scope="col">Booked (kg)</th>
-        <th scope="col">Revenue (USD)</th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (flight of current.flights; track flight._id) {
+  <div class="table-container">
+    <table>
+      <caption>Fictional cargo flights — departure times in Malaysia time (UTC+8)</caption>
+      <thead>
         <tr>
-          <th scope="row">{{ flight.flightNumber }}</th>
-          <td>{{ flight.origin }} - {{ flight.destination }}</td>
-          <td>{{ flight.departureAt | date:'dd MMM yyyy, HH:mm':'+0800' }}</td>
-          <td>{{ flight.capacityKg | number }}</td>
-          <td>{{ flight.bookedKg | number }}</td>
-          <td>{{ flight.revenueUsd | number:'1.2-2' }}</td>
+          <th scope="col">Flight</th>
+          <th scope="col">Route</th>
+          <th scope="col">Departure</th>
+          <th scope="col">Capacity (kg)</th>
+          <th scope="col">Booked (kg)</th>
+          <th scope="col">Revenue (USD)</th>
         </tr>
-      } @empty {
-        <tr>
-          <td colspan="6">No flights available.</td>
-        </tr>
-      }
-    </tbody>
-  </table>
-</div>
+      </thead>
+      <tbody>
+        @for (flight of filteredFlights(); track flight._id) {
+          <tr>
+            <th scope="row">{{ flight.flightNumber }}</th>
+            <td>{{ flight.origin }} - {{ flight.destination }}</td>
+            <td>{{ flight.departureAt | date:'dd MMM yyyy, HH:mm':'+0800' }}</td>
+            <td>{{ flight.capacityKg | number }}</td>
+            <td>{{ flight.bookedKg | number }}</td>
+            <td>{{ flight.revenueUsd | number:'1.2-2' }}</td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6">No flights available.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
 
-<h2>Weight utilisation by flight</h2>
+  <h2>Weight utilisation by flight</h2>
 
-<ul class="utilisation-chart">
-  @for (flight of current.flights; track flight._id) {
-    <li>
-      <span>{{ flight.flightNumber }}</span>
+  <ul class="utilisation-chart">
+    @for (flight of filteredFlights(); track flight._id) {
+      <li>
+        <span>{{ flight.flightNumber }}</span>
 
-      @if (flight.capacityKg > 0) {
-        <meter
-          min="0"
-          max="100"
-          [value]="flight.bookedKg / flight.capacityKg * 100"
-          [attr.aria-label]="flight.flightNumber + ' weight utilisation'"
-        ></meter>
-        <span>
-          {{ flight.bookedKg / flight.capacityKg * 100 | number:'1.1-1' }}%
-        </span>
-      } @else {
-        <span>Not available</span>
-      }
-    </li>
-  }
-</ul>
+        @if (flight.capacityKg > 0) {
+          <meter
+            min="0"
+            max="100"
+            [value]="flight.bookedKg / flight.capacityKg * 100"
+            [attr.aria-label]="flight.flightNumber + ' weight utilisation'"
+          ></meter>
+          <span>
+            {{ flight.bookedKg / flight.capacityKg * 100 | number:'1.1-1' }}%
+          </span>
+        } @else {
+          <span>Not available</span>
+        }
+      </li>
+    }
+  </ul>
 }
