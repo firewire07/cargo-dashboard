@@ -4,13 +4,14 @@ A learning project built one working slice at a time: Nest HTTP services, MongoD
 
 ## Where we are
 
-- Mongo, flights, capacity and gateway now run together in Docker Compose.
+- Angular/Nginx, Mongo, flights, capacity and gateway run together in Docker Compose.
 - Flights owns the Mongo documents; capacity reads flights over HTTP and calculates totals/weighted utilisation; gateway exposes `/flights` and `/capacity/summary`.
-- Angular runs separately on the host with a development proxy to the gateway. The dashboard includes summary cards, a flight table, filters and utilisation bars.
+- Angular is served as a production static build by Nginx on `http://localhost:8080`; host hot reload on 4200 remains optional. The dashboard includes summary cards, a flight table, filters and utilisation bars.
+- See [current architecture and horizontal scaling design](docs/architecture.md) for implemented boundaries versus future production plans.
 - Automated component/unit and isolated HTTP tests exist. CI and production deployment hardening remain future work.
 
 ```text
-Browser → Angular host :4200 → /api dev proxy → gateway :3000
+Browser → Angular/Nginx :8080 → /api reverse proxy → gateway :3000
                                                 ├─HTTP→ flights :3001 → mongo :27017
                                                 └─HTTP→ capacity :3002 ─HTTP→ flights :3001
 ```
@@ -23,12 +24,12 @@ These are independent npm apps communicating over HTTP, not Nest microservice tr
 | Capacity | `http://capacity:3002` / `http://localhost:3002` | [Capacity](apps/capacity/README.md) |
 | Gateway | `http://gateway:3000` / `http://localhost:3000` | [Gateway](apps/gateway/README.md) |
 | MongoDB | `mongodb://mongo:27017/cargo-dashboard` / host port 27017 | Steps below |
-| Angular | Host only, `http://localhost:4200` | [Web](apps/web/README.md) |
+| Angular/Nginx | `http://localhost:8080` (optional host hot reload: 4200) | [Web](apps/web/README.md) |
 
 ## Prerequisites
 
-- Docker Desktop/Engine running, with Docker Compose (`docker compose`). Backend dependencies/builds happen inside Docker; host Node/npm is not needed just to start the backend.
-- `curl` for manual HTTP checks; host ports 27017, 3000, 3001, 3002 and (for Angular) 4200 available.
+- Docker Desktop/Engine running, with Docker Compose (`docker compose`). Frontend/backend dependencies and builds happen inside Docker; host Node/npm is not needed to start the full stack.
+- `curl` for manual HTTP checks; host ports 27017, 3000, 3001, 3002 and 8080 available (4200 only for optional host development).
 - For host development or seeding: compatible Node/npm and the relevant app's installed dependencies. Dockerfiles pin Node `22.19.0-bookworm-slim`. Web declares Node `22.x >=22.19.0`; its npm engine and package manager both specify npm 11.6.2.
 
 Replace `/path/to/cargo-dashboard` with your checkout location in all examples.
@@ -46,7 +47,7 @@ cd /path/to/cargo-dashboard
 docker compose up -d --build
 ```
 
-This builds the three Nest images and starts all four services in the background. Images are reusable packaged filesystems; containers are running instances of those images. Source is copied into images, not bind-mounted: after backend source/dependency changes, run the command again to rebuild/recreate affected services. Restarting alone does not rebuild code.
+This builds the three Nest images and the Angular/Nginx image, then starts all five services in the background. Open **http://localhost:8080/** for the dashboard. Images are reusable packaged filesystems; containers are running instances of those images. Source is copied into images, not bind-mounted: after backend source/dependency changes, run the command again to rebuild/recreate affected services. Restarting alone does not rebuild code.
 
 Compose sets production mode and service addresses explicitly:
 
@@ -70,6 +71,9 @@ Mongo has a healthcheck (5-second interval/timeout, 10 retries, 10-second start 
 ### 4. Verify the HTTP path
 
 ```bash
+curl -i http://localhost:8080/
+curl -i http://localhost:8080/api/flights
+curl -i http://localhost:8080/api/capacity/summary
 curl -i http://localhost:3001/flights
 curl -i http://localhost:3002/capacity/summary
 curl -i http://localhost:3000/flights
@@ -78,16 +82,16 @@ curl -i http://localhost:3000/capacity/summary
 
 Expect HTTP 200: flight calls return an array, summary calls return aggregate fields. A new empty database returns no flights; summary utilisation is null when total capacity is zero. Existing seeded data should survive normal stop/down and up. The application does not seed automatically. See [development seed](apps/flights/README.md#development-seed) only if you intentionally want to initialise/replace fictional development records.
 
-## Angular on the host
+## Angular on the host (optional hot reload)
 
-With web dependencies already installed, start a separate terminal:
+For host hot reload, start only the backend with `docker compose up -d mongo flights capacity gateway`. The Nginx web container may also remain running on 8080; the host dev server uses 4200. With web dependencies already installed, start a separate terminal:
 
 ```bash
 cd /path/to/cargo-dashboard/apps/web
 npm start -- --proxy-config proxy.conf.json
 ```
 
-Open `http://localhost:4200/`. The checked-in dev proxy forwards `/api` to `http://localhost:3000` and removes the `/api` prefix. The browser calls `/api/flights` and `/api/capacity/summary`; it does not use Compose DNS. The proxy is explicitly passed because `npm start` alone is `ng serve` and `angular.json` does not configure it automatically. This is a development proxy, not production web hosting; Angular is not part of Compose.
+Open `http://localhost:4200/`. The checked-in dev proxy forwards `/api` to `http://localhost:3000` and removes the `/api` prefix. The browser calls `/api/flights` and `/api/capacity/summary`; it does not use Compose DNS. The proxy is explicitly passed because `npm start` alone is `ng serve` and `angular.json` does not configure it automatically. This development proxy is separate from the production-style Nginx reverse proxy used by the Compose web service. Rebuild `docker compose up -d --build web` after frontend changes for the static container; the host dev server reloads automatically.
 
 Optional proxy checks while Angular is running:
 
@@ -122,7 +126,7 @@ A later `docker compose up -d` reuses `mongo_data` (normally project-prefixed by
 - Copying package manifests before source allows dependency-install layers to be cached when only application source changes. Cache reuse depends on inputs; it is not a guaranteed request-speed improvement.
 - `.dockerignore` excludes local dependencies, build output, coverage, Git metadata, environment files and logs. The runtime has no TypeScript seed source or dev-only `ts-node`; run the seed from the host as documented, not inside the production image.
 - Runtime uses the non-root `node` user and owned copied files. Fewer dev tools and a non-root runtime reduce unnecessary contents/privileges; this alone does not make the deployment production-ready or audited.
-- `EXPOSE` describes an image port; Compose `ports` publishes it. All four services bind host publications to `127.0.0.1`, including Mongo (`127.0.0.1:27017:27017`). Mongo still has no authentication: loopback binding reduces host-network exposure but does not make this a production-secured database. Existing containers keep their previous port bindings until recreated; run `docker compose up -d mongo` from the repository root to apply the Mongo change while keeping its named volume.
+- `EXPOSE` describes an image port; Compose `ports` publishes it. All five services bind host publications to `127.0.0.1`, including Mongo (`127.0.0.1:27017:27017`). Mongo still has no authentication: loopback binding reduces host-network exposure but does not make this a production-secured database. Existing containers keep their previous port bindings until recreated; run `docker compose up -d mongo` from the repository root to apply the Mongo change while keeping its named volume.
 
 ## Configuration and troubleshooting
 
@@ -133,7 +137,7 @@ For optional host Nest watch mode, see the per-app guides. Stop the Docker backe
 - Port already allocated: check for a previous host Nest process or another container using 3000–3002/27017. Do not kill unrelated processes as a shortcut.
 - Mongo connection/readiness issue: inspect Mongo health/logs and verify the configured database address. Container flights must use `mongo`, not `localhost`.
 - Gateway upstream errors: inspect flights/capacity logs and direct host endpoints. A running container is not proof its dependency is ready.
-- UI API errors: check gateway endpoints first, then ensure Angular was started with the proxy configuration.
+- UI API errors: check gateway endpoints first. For container web, check `docker compose logs --tail=50 web` and `/api` on 8080; for host development, ensure Angular was started with the proxy configuration. Web health indicates Nginx liveness only, not dependency readiness. If 8080 is occupied, preserve the existing service and choose an explicit local port override before starting web.
 - Empty flights after restart: check the same Compose project/volume/database is being used. Do not reseed valuable data as a troubleshooting reset.
 
 ## Performance learning notes

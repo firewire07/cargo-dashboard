@@ -19,7 +19,7 @@ curl -i http://localhost:3000/capacity/summary
 
 Compose builds `cargo-gateway:dev`, listens on 3000 with a loopback host publication, and sets `FLIGHTS_URL=http://flights:3001` and `CAPACITY_URL=http://capacity:3002`. Those service names work inside Compose; use `localhost:3000` from the host/browser. `depends_on` orders startup but does not wait for the upstream HTTP APIs to be ready. Use logs/direct endpoint checks if an initial request fails.
 
-Angular remains on the host: run `npm start -- --proxy-config proxy.conf.json` from `apps/web` after its dependencies are installed. `/api` is forwarded to this gateway with the prefix removed. See the [web guide](../web/README.md).
+Angular is served by the Compose web service at `http://localhost:8080`, with same-origin `/api` forwarded to this gateway and the prefix removed. Optional host hot reload remains available: run `npm start -- --proxy-config proxy.conf.json` from `apps/web` after its dependencies are installed. See the [web guide](../web/README.md).
 
 Use the [root stop/resume instructions](../../README.md#stop-and-resume); do not use `down -v` for routine stopping because it deletes Mongo data. Rebuild images after backend source changes.
 
@@ -68,7 +68,7 @@ Use a base URL **without** `/flights` or a trailing slash: the service appends `
 
 These apps communicate over ordinary HTTP, not Nest's microservice transport layer. The gateway forwards the flight list and `GET /capacity/summary` to their respective services. Authentication, caching, rate limiting and upstream resilience policies are not implemented. A single API entry point simplifies the future UI, but the extra hop has overhead; this architecture is not proof of better performance. `firstValueFrom` converts the HTTP Observable to a Promise so the service can await the response.
 
-In the Docker workflow all three Nest services are containerised and use Compose DNS (`flights`, `capacity`). In the host alternative they use `localhost` URLs. Angular stays on the host in either case.
+In the Docker workflow all three Nest services are containerised and use Compose DNS (`flights`, `capacity`). In the host alternative they use `localhost` URLs. Angular defaults to the Nginx web container on 8080, with optional host development on 4200.
 
 ## Troubleshooting
 

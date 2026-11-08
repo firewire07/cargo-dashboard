@@ -2,9 +2,35 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.29.
 
-## Development server
+## Production-style container
 
-Start the Docker backend using the [main project guide](../../README.md#run-the-docker-backend). Angular itself still runs on the host, not in Compose. With web dependencies already installed, replace the checkout placeholder below and run:
+From the repository root:
+
+```bash
+docker compose up -d --build
+```
+
+Open **http://localhost:8080/**. The Node 22.19.0/npm 11.6.2 build stage uses the committed lockfile and produces `dist/web/browser`; only those static files enter the unprivileged Nginx 1.28 Alpine runtime. No dev server or Node runtime is needed in the final image. This is a local production-style build, not a secured public deployment.
+
+Nginx forwards same-origin `/api/flights` and `/api/capacity/summary` to gateway without `/api`, preserving query parameters. SPA route refresh falls back to `index.html`; missing assets return 404 and API errors remain API errors. HTML/nonhashed assets revalidate, hashed JS/CSS caches immutably, and API responses are not cached. `/healthz` and the Compose healthcheck prove only web-server liveness. See [architecture and future scaling](../../docs/architecture.md).
+
+```bash
+docker compose ps web
+docker compose logs --tail=50 web
+curl -i http://localhost:8080/
+curl -i http://localhost:8080/api/flights
+curl -i http://localhost:8080/api/capacity/summary
+# After frontend source changes:
+docker compose up -d --build web
+# Stop just web without touching Mongo:
+docker compose stop web
+```
+
+The web build context allowlists source/public files and build configuration; no `.env`, `.npmrc`, local dependencies or Git history enters it. Never add secrets under `src` or `public`: frontend output is public by design. Keep database volumes intact; no reseed is needed.
+
+## Development server (optional hot reload)
+
+Start only the backend from the repository root with `docker compose up -d mongo flights capacity gateway` (or leave the full stack running). The optional Angular dev server uses host port 4200, distinct from container web on 8080. With web dependencies already installed, replace the checkout placeholder below and run:
 
 ```bash
 cd /path/to/cargo-dashboard/apps/web
@@ -37,7 +63,7 @@ To build the project run:
 ng build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+This will compile your project and store the browser build artifacts in `dist/web/browser/`. By default, the production build optimizes your application for performance and speed.
 
 ## Running unit tests
 

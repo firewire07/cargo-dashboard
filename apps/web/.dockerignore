@@ -1,0 +1,12 @@
+# Allow only public build inputs into the Docker context (no env/npm auth files).
+*
+!Dockerfile
+!nginx.conf
+!package.json
+!package-lock.json
+!angular.json
+!tsconfig*.json
+!src/
+!src/**
+!public/
+!public/**
